@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>מדריך למשתמש — ניהול פנימיה · ישיבת רגבים בנימין</title>
+  <link rel="stylesheet" href="styles.css?v=2" />
+  <style>
+    /* עיצוב ייעודי לעמוד המדריך */
+    .guide-hero { background: linear-gradient(160deg, var(--brand-dark), var(--brand)); color: #fff; padding: 34px 22px 28px; text-align: center; }
+    .guide-hero h1 { margin: 0 0 6px; font-size: 26px; }
+    .guide-hero p { margin: 0; opacity: .9; font-size: 15px; }
+    .guide-hero .app-link { display: inline-block; margin-top: 14px; background: #fff; color: var(--brand-dark); font-weight: 700; padding: 9px 20px; border-radius: 999px; text-decoration: none; font-size: 14px; }
+    .guide-wrap { max-width: 860px; margin: 0 auto; padding: 22px 16px 60px; }
+    .guide-toc { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin: -34px auto 26px; max-width: 860px; padding: 0 16px; position: relative; }
+    .guide-toc a { background: var(--card); border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow); padding: 14px; text-decoration: none; color: var(--text); font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 8px; }
+    .guide-toc a:hover { border-color: var(--brand); }
+    .gsec { margin-top: 34px; }
+    .gsec > h2 { color: var(--brand-dark); font-size: 21px; border-bottom: 2px solid var(--brand-light); padding-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+    .gsec h3 { color: var(--brand-dark); font-size: 16px; margin: 22px 0 8px; }
+    .role-badge { font-size: 12px; font-weight: 700; padding: 2px 10px; border-radius: 999px; vertical-align: 3px; }
+    .role-admin { background: #dbeafe; color: #1e40af; }
+    .role-madrich { background: #dcfce7; color: #166534; }
+    .role-chug { background: #fef3c7; color: #92400e; }
+    .steps { counter-reset: step; list-style: none; padding: 0; margin: 10px 0; }
+    .steps li { counter-increment: step; position: relative; padding: 10px 44px 10px 12px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; margin-bottom: 8px; box-shadow: var(--shadow); line-height: 1.6; }
+    .steps li::before { content: counter(step); position: absolute; right: 12px; top: 10px; width: 24px; height: 24px; border-radius: 50%; background: var(--brand); color: #fff; font-weight: 800; font-size: 13px; display: flex; align-items: center; justify-content: center; }
+    .tip { background: #f0f7ff; border: 1px solid #bcd7f5; border-radius: 12px; padding: 12px 14px; margin: 12px 0; font-size: 14px; line-height: 1.6; }
+    .tip b:first-child { color: var(--brand-dark); }
+    .warn { background: #fffaf0; border: 1px solid #f0d79a; border-radius: 12px; padding: 12px 14px; margin: 12px 0; font-size: 14px; line-height: 1.6; }
+    .btn-demo { display: inline-block; font-size: 12.5px; font-weight: 700; padding: 3px 10px; border-radius: 7px; border: 1.5px solid var(--border); background: #fff; white-space: nowrap; }
+    .btn-demo.g { background: var(--ok); color: #fff; border-color: var(--ok); }
+    .btn-demo.r { background: var(--danger); color: #fff; border-color: var(--danger); }
+    .btn-demo.o { background: var(--warn); color: #fff; border-color: var(--warn); }
+    .btn-demo.p { background: #7c3aed; color: #fff; border-color: #7c3aed; }
+    .btn-demo.b { background: var(--brand); color: #fff; border-color: var(--brand); }
+    table.grid td:first-child { font-weight: 600; white-space: nowrap; }
+    .faq-q { font-weight: 700; color: var(--brand-dark); margin: 14px 0 4px; }
+    .guide-foot { text-align: center; color: var(--muted); font-size: 13px; margin-top: 44px; border-top: 1px solid var(--border); padding-top: 16px; }
+    body.dark .tip { background: #16222f; border-color: #2a4562; }
+    body.dark .warn { background: #2b2415; border-color: #5a4a25; }
+    body.dark .btn-demo { background: var(--card); }
+    @media print { .guide-hero .app-link, .guide-toc { display: none; } }
+  </style>
+</head>
+<body>
+  <script>try { if (localStorage.getItem('dorm_dark') === '1') document.body.classList.add('dark'); } catch (e) {}</script>
+
+  <div class="guide-hero">
+    <div style="font-size:44px;">🏠</div>
+    <h1>מדריך למשתמש — ניהול פנימיה</h1>
+    <p>ישיבת רגבים בנימין · נוכחות, חוגים וחינוך תלמידים</p>
+    <a class="app-link" href="./">↩ כניסה לאפליקציה</a>
+  </div>
+
+  <nav class="guide-toc">
+    <a href="#login">🔑 כניסה למערכת</a>
+    <a href="#madrich">🧑‍🏫 למדריך</a>
+    <a href="#chug">🎨 למדריך חוג</a>
+    <a href="#manager">👔 למנהל הפנימיה</a>
+    <a href="#faq">❓ שאלות נפוצות</a>
+  </nav>
+
+  <div class="guide-wrap">
+
+    <!-- ============ מבוא ============ -->
+    <section class="gsec">
+      <h2>👋 מה יש במערכת?</h2>
+      <p>המערכת מרכזת את כל ניהול הפנימיה במקום אחד, מכל מחשב או טלפון. מה שרואים תלוי בתפקיד:</p>
+      <div class="tbl-scroll"><table class="grid">
+        <thead><tr><th>תפקיד</th><th>מה רואים ועושים</th></tr></thead>
+        <tbody>
+          <tr><td><span class="role-badge role-admin">מנהל פנימיה</span></td><td>הכל: דשבורד חי, כל הדוחות, נתוני בסיס, ניהול משתמשים והגדרות</td></tr>
+          <tr><td><span class="role-badge role-madrich">מדריך</span></td><td>סימון נוכחות (הכיתה שלו נבחרת אוטומטית), דוחות הכיתה שלו, שיחות אישיות, צפייה בחוגים</td></tr>
+          <tr><td><span class="role-badge role-chug">מדריך חוג</span></td><td>דיווח על מפגשי החוגים שלו בלבד</td></tr>
+        </tbody>
+      </table></div>
+      <div class="tip"><b>💡 הכל מסונכרן בזמן אמת:</b> כשמדריך מסמן נוכחות בטלפון, המנהל רואה את זה בדשבורד באותה שנייה. אפשר לעבוד כמה אנשים במקביל בלי לדרוס אחד את השני.</div>
+    </section>
+
+    <!-- ============ כניסה ============ -->
+    <section class="gsec" id="login">
+      <h2>🔑 כניסה למערכת</h2>
+      <ol class="steps">
+        <li>נכנסים לכתובת: <b>guytsuberi1.github.io/regavim-dorm</b> (שמרו כסימנייה או כקיצור במסך הבית של הטלפון)</li>
+        <li>מזינים <b>אימייל וסיסמה</b> שקיבלתם ממנהל הפנימיה</li>
+        <li>לוחצים <span class="btn-demo b">כניסה</span> — והמערכת זוכרת אתכם לפעמים הבאות</li>
+      </ol>
+      <div class="tip"><b>📱 קיצור במסך הבית (מומלץ לכל הצוות):</b> באייפון — ספארי → כפתור שיתוף → "הוסף למסך הבית". באנדרואיד — כרום → ⋮ → "הוספה למסך הבית". מקבלים אייקון שנפתח כמו אפליקציה.</div>
+      <div class="tip"><b>🌙 מצב לילה:</b> המתג עם השמש/ירח למעלה מחליף בין תצוגה בהירה לכהה — נוח לסימון נוכחות בערב.</div>
+      <p><b>שכחתם סיסמה?</b> במסך הכניסה מלאו את האימייל ולחצו "שכחתי סיסמה" — יישלח אליכם מייל עם קישור לבחירת סיסמה חדשה (בדקו גם בספאם). אפשר גם לבקש מהמנהל לאפס לכם.</p>
+    </section>
+
+    <!-- ============ מדריך ============ -->
+    <section class="gsec" id="madrich">
+      <h2>🧑‍🏫 למדריך <span class="role-badge role-madrich">מדריך</span></h2>
+
+      <h3>✅ סימון נוכחות בזמן פנימיה (הפעולה היומית)</h3>
+      <ol class="steps">
+        <li>נכנסים לאפליקציה — מסך <b>הנוכחות</b> נפתח אוטומטית, על התאריך של היום, <b>עם הכיתה שלכם</b> כבר מסומנת</li>
+        <li>ליד כל תלמיד מקישים על הסטטוס: <span class="btn-demo g">✓ נוכח</span> <span class="btn-demo r">✕ נעדר</span> <span class="btn-demo o">🏠 בבית</span> <span class="btn-demo p">🤒 מחלה</span></li>
+        <li>כל הקשה <b>נשמרת מיד</b> — אין כפתור שמירה. פס ההתקדמות למעלה מראה כמה נשארו</li>
+        <li>תלמיד שרוב הכיתה נוכחת? לוחצים <span class="btn-demo">✓ סמן את כל הנותרים כנוכחים</span> ומתקנים רק את החריגים</li>
+        <li>רוצים לציין סיבה (אישור יציאה, איחור וכו')? לוחצים על <span class="btn-demo">📝</span> ליד התלמיד וכותבים הערה</li>
+        <li>בסוף זמן הפנימיה, אחרי שהכל מעודכן — לוחצים <span class="btn-demo b">🔒 סיום זמן פנימיה — סגירת היום</span>. זה הדיווח הסופי ("מה באמת היה")</li>
+      </ol>
+      <div class="warn"><b>⚠️ שימו לב:</b> אחרי סגירת היום הגיליון ננעל לעריכה. טעיתם אחרי הסגירה? רק המנהל יכול לפתוח מחדש.</div>
+      <div class="tip"><b>💡 מחליפים מדריך אחר?</b> אפשר לעבור לכל כיתה דרך כפתורי הכיתות שמעל הרשימה — ליד כל כיתה רואים כמה כבר סומנו.</div>
+
+      <h3>📅 דוחות נוכחות של הכיתה</h3>
+      <p>בטאב <b>דוחות נוכחות</b> רואים את ההיסטוריה של הכיתה שלכם: לפי תאריך (מי היה חסר באיזה ערב) או לפי תלמיד (אחוז נוכחות, כל ההיעדרויות שלו). שימושי לפני שיחה עם תלמיד או עם הורים.</p>
+
+      <h3>💬 שיחה אישית (גיליון חינוך תלמידים)</h3>
+      <ol class="steps">
+        <li>אחרי שיחה אישית עם תלמיד — נכנסים לטאב <b>🎓 חינוך תלמידים</b> ולוחצים <span class="btn-demo b">💬 שיחה אישית חדשה</span></li>
+        <li>בוחרים את התלמיד וממלאים את השאלון הקצר (דירוגים 1–5, טקסט חופשי)</li>
+        <li>כותבים סיכום קצר ובוחרים <b>רמזור</b>: 🟢 תקין · 🟠 דורש מעקב · 🔴 דורש טיפול</li>
+        <li>שומרים — השיחה מתועדת והרמזור של התלמיד מתעדכן. המנהל רואה הכל</li>
+      </ol>
+    </section>
+
+    <!-- ============ מדריך חוג ============ -->
+    <section class="gsec" id="chug">
+      <h2>🎨 למדריך חוג <span class="role-badge role-chug">מדריך חוג</span></h2>
+      <ol class="steps">
+        <li>נכנסים לאפליקציה — רואים ישר את <b>החוגים שלכם</b>, ואם החוג מתקיים היום מופיע "ממתין לדיווח"</li>
+        <li>בסוף המפגש לוחצים <span class="btn-demo b">📝 דיווח מפגש היום</span></li>
+        <li>מסמנים לכל תלמיד ברשימת החוג: <span class="btn-demo g">✓ נוכח</span> או <span class="btn-demo r">✕ נעדר</span> (יש כפתור "סמן את כל השאר כנוכחים")</li>
+        <li>נותנים <b>דירוג למפגש</b> (1–5) ואפשר להוסיף הערה קצרה — איך היה, אירועים מיוחדים</li>
+        <li><span class="btn-demo b">שליחת הדיווח</span> — והמנהל רואה שהחוג דווח ✓</li>
+      </ol>
+      <div class="tip"><b>💡 טעות בדיווח?</b> אפשר לפתוח דיווח קיים ולערוך אותו — הדיווחים האחרונים מופיעים מתחת לכל חוג.</div>
+    </section>
+
+    <!-- ============ מנהל ============ -->
+    <section class="gsec" id="manager">
+      <h2>👔 למנהל הפנימיה <span class="role-badge role-admin">מנהל</span></h2>
+
+      <h3>📊 הדשבורד — התמונה החיה</h3>
+      <p>מסך הפתיחה שלך. מציג בזמן אמת: כמה נוכחים/נעדרים/טרם סומנו הערב, נוכחות לפי כיתה עם שמות החסרים, אילו חוגים דיווחו ואילו ממתינים, ותמונת הרמזור החינוכי — כולל התראה על תלמידים שלא נערכה איתם שיחה מעל 30 יום. לחיצה על כל כרטיס קופצת לגיליון המתאים.</p>
+
+      <h3>🗂️ נתוני בסיס — התשתית</h3>
+      <div class="tbl-scroll"><table class="grid">
+        <thead><tr><th>לשונית</th><th>מה מגדירים</th></tr></thead>
+        <tbody>
+          <tr><td>תלמידים</td><td>שם, כיתה, מבנה/חדר, טלפונים של התלמיד וההורים. לחיצה על שם תלמיד פותחת כרטיס מסכם</td></tr>
+          <tr><td>כיתות</td><td>ט, י1, י2, יא, יב — אפשר לשנות ולהוסיף</td></tr>
+          <tr><td>צוות</td><td>שם, <b>אימייל</b> (זה מה שמזהה את המשתמש!), <b>תפקיד</b>, וכיתה באחריות למדריך</td></tr>
+          <tr><td>חוגים</td><td>שם, מדריך החוג, ימי פעילות, שעה, ובחירת התלמידים הרשומים (כפתור 👥)</td></tr>
+        </tbody>
+      </table></div>
+      <div class="tip"><b>💡 ייבוא תלמידים:</b> בתפריט <b>⋮</b> למעלה — ייבוא מקובץ הגיבוי של אפליקציית החקלאות (עם שיוך אוטומטי לכיתות) או מתבנית אקסל. במקום להקליד 100 שמות.</div>
+      <div class="tip"><b>💡 אין מחיקה — יש ארכיון:</b> תלמיד שעזב מעבירים לארכיון (📦). ההיסטוריה שלו נשמרת ואפשר לשחזר בכל רגע.</div>
+
+      <h3>👥 ניהול משתמשים (בהגדרות)</h3>
+      <ol class="steps">
+        <li>מוסיפים את איש הצוות ב<b>נתוני בסיס → צוות</b> עם אימייל, טלפון ותפקיד</li>
+        <li>ב<b>הגדרות → ניהול משתמשים</b> לוחצים <span class="btn-demo">➕ צור חשבון</span> — נוצרת סיסמה אקראית</li>
+        <li>או הכי נוח: לוחצים על <b>כפתור הוואטסאפ הירוק</b> — נפתחת הודעה מוכנה עם הקישור, האימייל והסיסמה, ורק שולחים 📲</li>
+        <li>שכח סיסמה? <span class="btn-demo">🔑</span> מאפס ברגע</li>
+      </ol>
+      <div class="warn"><b>⚠️ התפקיד קובע הכל:</b> מי שמוגדר "מדריך" רואה רק את מסכי המדריך; "מדריך חוג" רואה רק את החוגים שלו. שינוי תפקיד נכנס לתוקף בכניסה הבאה שלו.</div>
+
+      <h3>📅 דוחות ובקרה</h3>
+      <p><b>דוחות נוכחות</b> — כל הכיתות, לפי תאריך או תלמיד, כולל <b>ייצוא חודש שלם לאקסל</b> (תפריט ⋮). <b>גיליון חינוך תלמידים</b> — כל השיחות של כל המדריכים עם סינון לפי תלמיד/מדריך/רמזור, ועדכון רמזור ידני בלחיצה על התג. יום נוכחות שנסגר בטעות? בגיליון הנוכחות יש לך <span class="btn-demo">🔓 פתיחה מחדש</span>.</p>
+
+      <h3>⚙️ הגדרות</h3>
+      <p>שם המוסד ולוגו (מופיע אצל כולם), <b>ימי זמן פנימיה</b> (כרגע ראשון–רביעי), <b>עריכת שאלון השיחה האישית</b> (הוספה/שינוי/סידור שאלות — דירוג, טקסט או כן/לא), וגיבויים: הנתונים מסונכרנים בענן אוטומטית, ובנוסף יש גיבוי אוטומטי במכשיר וכפתור "הורד גיבוי" לקובץ.</p>
+    </section>
+
+    <!-- ============ שאלות נפוצות ============ -->
+    <section class="gsec" id="faq">
+      <h2>❓ שאלות נפוצות</h2>
+
+      <div class="faq-q">אני לא רואה את כל המסכים שמופיעים במדריך</div>
+      <p>זה בכוונה — התצוגה תלויה בתפקיד. אם אתם אמורים לראות יותר, בקשו ממנהל הפנימיה לעדכן את התפקיד שלכם (נתוני בסיס → צוות), וצאו והיכנסו מחדש.</p>
+
+      <div class="faq-q">סימנתי נוכחות ובמכשיר אחר זה לא מופיע</div>
+      <p>בדקו שיש חיבור לאינטרנט. בפינה למעלה מופיע חיווי — "נשמר בענן" אומר שהכל סונכרן. הסימונים נשמרים גם מקומית, אז שום דבר לא הולך לאיבוד גם אם הרשת נפלה לרגע.</p>
+
+      <div class="faq-q">שני מדריכים סימנו בו-זמנית — מה קורה?</div>
+      <p>הכל בסדר: המערכת ממזגת את הסימונים לפי תלמיד. רק אם שניים סימנו את <b>אותו תלמיד</b> — הסימון האחרון קובע.</p>
+
+      <div class="faq-q">סגרתי את היום בטעות</div>
+      <p>רק מנהל יכול לפתוח מחדש: גיליון הנוכחות → "🔓 פתיחה מחדש (מנהל)".</p>
+
+      <div class="faq-q">האפליקציה נראית "תקועה" על גרסה ישנה</div>
+      <p>רעננו את הדף (משיכה למטה בטלפון / Ctrl+F5 במחשב). אם עדיין — סגרו את הדפדפן ופתחו מחדש.</p>
+
+      <div class="faq-q">איפה מדווחים על תקלת תחזוקה?</div>
+      <p>מודול התחזוקה ייבנה כאפליקציה ייעודית נפרדת — בינתיים מדווחים בדרך הרגילה. כשהיא תקום, הדשבורד כאן יציג את הסטטוס שלה.</p>
+    </section>
+
+    <div class="guide-foot">
+      ניהול פנימיה · ישיבת רגבים בנימין<br>
+      <a href="./" style="color:var(--brand);">כניסה לאפליקציה ←</a>
+    </div>
+  </div>
+</body>
+</html>
