@@ -614,6 +614,7 @@
           + '<div class="um-name">' + escHtml(name) + '</div>'
           + '<div class="um-email">' + escHtml(email) + '</div>'
           + '<div class="um-role">הרשאה: ' + escHtml(roleLabel(currentRole())) + '</div>'
+          + '<a class="um-item" href="guide.html" target="_blank" style="text-decoration:none;display:block;">📖 מדריך למשתמש</a>'
           + '<button class="um-item um-logout" id="umLogout">↩️ התנתקות</button>'
         + '</div></div>';
       var ab = document.getElementById('avatarBtn'), pop = document.getElementById('userPop');
