@@ -17,7 +17,11 @@
     root.appendChild(U.el('div', { class: 'page-head' }, [
       U.el('h2', { text: '📊 דשבורד' }),
       U.dateChip(U.weekdayName(today) + ' · ' + U.gregLabel(today) + ' · ' + U.hebrewDate(today), null, { title: 'היום' }),
-      U.el('div', { class: 'spacer' })
+      U.el('div', { class: 'spacer' }),
+      U.actionMenu([
+        { html: U.WA_SVG, label: 'סיכום ערב לוואטסאפ', onClick: function () { sendSummaryWhatsApp(); } },
+        { icon: '📋', label: 'העתקת סיכום הערב', onClick: function () { copySummary(); } }
+      ])
     ]));
 
     if (!students.length) {
@@ -62,6 +66,26 @@
       kpi('kpi-neutral', '⏳', unmarked, 'טרם סומנו', null, function () { App.setTab('attendance'); }),
       kpi('kpi-info', '📋', dayState, 'סטטוס היום', session && session.closedBy ? 'נסגר ע"י ' + session.closedBy : null)
     ]));
+
+    // ---------- מגמת נוכחות — 14 ימי הפעילות האחרונים ----------
+    var attDatesAll = Object.keys(Store.get().att || {}).sort();
+    if (attDatesAll.length > 1) {
+      var att = Store.get().att;
+      var trendCols = attDatesAll.slice(-14).map(function (d) {
+        var present = 0;
+        students.forEach(function (s) { var m = att[d].marks[s.id]; if (m && m.st === 'present') present++; });
+        var pct = students.length ? Math.round(present / students.length * 100) : 0;
+        return { label: U.gregLabel(d), pct: pct, text: pct + '%', cur: d === today,
+          title: U.weekdayName(d) + ' ' + U.gregLabel(d) + ' — נוכחים ' + present + '/' + students.length };
+      });
+      var trendPanel = U.el('div', { class: 'dash-panel', style: 'margin-bottom:18px;' });
+      trendPanel.appendChild(U.el('div', { class: 'dash-panel-head' }, [
+        U.el('h3', { text: '📈 מגמת נוכחות — ' + trendCols.length + ' ימי הפעילות האחרונים' }),
+        U.el('button', { class: 'btn small secondary', onclick: function () { App.setTab('atthistory'); } }, 'לדוחות ←')
+      ]));
+      trendPanel.appendChild(U.el('div', { class: 'trend-scroll' }, [U.trendChart(trendCols)]));
+      root.appendChild(trendPanel);
+    }
 
     // ---------- שתי עמודות: נוכחות לפי כיתה + חוגים היום ----------
     var cols = U.el('div', { class: 'dash-cols' });
@@ -172,18 +196,98 @@
       });
     }
 
-    // תלמידים ללא שיחה מעל 30 יום
+    // מעקבים פתוחים (שיחות שסומנו "נדרש מעקב" וטרם טופלו)
+    var openFU = (Store.get().edu.conversations || []).filter(function (c) { return c.followUp && !c.followUpDone; });
+    if (openFU.length) {
+      panel.appendChild(U.el('div', { class: 'dash-row', style: 'cursor:pointer;', onclick: function () { App.setTab('education'); } }, [
+        U.el('span', { class: 'tl tl-orange', text: '⚠️ ' + openFU.length + ' מעקבים פתוחים' }),
+        U.el('span', { class: 'muted', style: 'font-size:12.5px;', text: 'שיחות שדרשו המשך טיפול — לחצו למעבר' })
+      ]));
+    }
+
+    // נעדרים ברצף (2+ ערבים)
+    var streaks = students.map(function (s) { return { s: s, n: Store.absStreak(s.id) }; })
+      .filter(function (x) { return x.n >= 2; })
+      .sort(function (a, b) { return b.n - a.n; });
+    if (streaks.length) {
+      panel.appendChild(U.el('div', { class: 'dash-sec', text: '❌ נעדרים ברצף' }));
+      streaks.slice(0, 6).forEach(function (x) {
+        panel.appendChild(U.el('div', { class: 'dash-row' }, [
+          U.el('span', { class: 'tl tl-red', text: x.n + ' ערבים' }),
+          U.el('span', { style: 'font-weight:600;', text: x.s.name }),
+          U.el('span', { class: 'muted', style: 'font-size:12px;', text: global.ClassName ? ClassName(x.s.classId) : '' })
+        ]));
+      });
+    }
+
+    // תלמידים ללא שיחה אישית מעבר ליעד
     var today = U.todayISO();
+    var gd = (Store.core().settings || {}).convGoalDays || 30;
     var noConv = students.filter(function (s) {
       var lc = Store.lastConversation(s.id);
       if (!lc) return true;
-      return (U.fromISO(today) - U.fromISO(lc.date)) / 86400000 > 30;
+      return (U.fromISO(today) - U.fromISO(lc.date)) / 86400000 > gd;
     });
     if (noConv.length) {
-      panel.appendChild(U.el('div', { class: 'dash-sec', text: '⏰ ללא שיחה אישית מעל 30 יום (' + noConv.length + ')' }));
+      panel.appendChild(U.el('div', { class: 'dash-sec', text: '⏰ ללא שיחה אישית מעל ' + gd + ' יום (' + noConv.length + ')' }));
       panel.appendChild(U.el('div', { class: 'muted', style: 'font-size:12.5px;', text: noConv.slice(0, 10).map(function (s) { return s.name; }).join(' · ') + (noConv.length > 10 ? ' · …' : '') }));
     }
     return panel;
+  }
+
+  // ---------- סיכום ערב: טקסט מוכן לוואטסאפ ----------
+  function buildSummaryText() {
+    var today = U.todayISO();
+    var students = activeStudents();
+    var session = Store.attFor(today, false);
+    var marks = (session && session.marks) || {};
+    var lines = ['*סיכום זמן פנימיה — ' + U.weekdayName(today) + ' ' + U.gregLabel(today) + '*'];
+
+    var present = 0, out = [];
+    students.forEach(function (s) {
+      var m = marks[s.id];
+      if (m && m.st === 'present') present++;
+      else if (m) out.push(s.name + ' (' + U.attLabel(m.st) + (m.note ? ' — ' + m.note : '') + ')');
+    });
+    var unmarked = students.length - present - out.length;
+    lines.push('✅ נוכחים: ' + present + '/' + students.length + (session && session.status === 'closed' ? ' · היום נסגר 🔒' : ''));
+    if (out.length) lines.push('🚫 לא בפנימיה (' + out.length + '):\n' + out.map(function (t) { return '· ' + t; }).join('\n'));
+    if (unmarked > 0) lines.push('⏳ טרם סומנו: ' + unmarked);
+
+    // לפי כיתה
+    var byClass = (Store.core().classes || []).map(function (c) {
+      var stus = students.filter(function (s) { return s.classId === c.id; });
+      if (!stus.length) return null;
+      var p = stus.filter(function (s) { return marks[s.id] && marks[s.id].st === 'present'; }).length;
+      return c.name + ' ' + p + '/' + stus.length;
+    }).filter(Boolean);
+    if (byClass.length) lines.push('🏫 לפי כיתה: ' + byClass.join(' · '));
+
+    // חוגים של היום
+    var chugim = (Store.core().chugim || []).filter(function (c) {
+      return c.active !== false && (c.days || []).indexOf(U.fromISO(today).getDay()) !== -1;
+    });
+    if (chugim.length) {
+      lines.push('🎨 חוגים: ' + chugim.map(function (c) {
+        var rep = Store.reportFor(c.id, today);
+        return c.name + (rep ? ' ✓' + (rep.rating ? ' ★' + rep.rating : '') : ' — ממתין לדיווח');
+      }).join(' · '));
+    }
+    return lines.join('\n\n');
+  }
+
+  function sendSummaryWhatsApp() {
+    window.open('https://wa.me/?text=' + encodeURIComponent(buildSummaryText()), '_blank');
+  }
+
+  function copySummary() {
+    var txt = buildSummaryText();
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(txt).then(function () { U.toast('הסיכום הועתק — אפשר להדביק בכל מקום'); })
+        .catch(function () { U.toast('ההעתקה נכשלה', 'error'); });
+    } else {
+      U.toast('הדפדפן לא תומך בהעתקה אוטומטית', 'error');
+    }
   }
 
   // תחזוקה — placeholder לאפליקציה הייעודית

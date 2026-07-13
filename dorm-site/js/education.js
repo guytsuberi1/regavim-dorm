@@ -26,6 +26,28 @@
     return all.filter(function (c) { return (c.by || '').toLowerCase() === em; });
   }
 
+  function goalDays() { return (Store.core().settings || {}).convGoalDays || 30; }
+
+  // מעקבים פתוחים: שיחות שסומנו "נדרש מעקב" וטרם טופלו
+  function openFollowUps() {
+    return myConversations().filter(function (c) { return c.followUp && !c.followUpDone; });
+  }
+
+  function markFollowUpDone(conv) {
+    Modal.confirm({
+      title: 'סימון מעקב כטופל',
+      text: 'לסמן את המעקב של השיחה הזו כטופל?\nהשיחה עצמה נשארת בהיסטוריה.',
+      okLabel: '✓ טופל'
+    }, function () {
+      conv.followUpDone = true;
+      conv.followUpDoneBy = Store.myName();
+      conv.followUpDoneAt = new Date().toISOString();
+      Store.upsertConversation(conv);
+      App.render();
+      U.toast('המעקב סומן כטופל');
+    });
+  }
+
   function render(root) {
     root.appendChild(U.el('div', { class: 'page-head' }, [
       U.el('h2', { text: '🎓 חינוך תלמידים' }),
@@ -33,19 +55,82 @@
       U.el('button', { class: 'btn', onclick: function () { openConversationForm(null); } }, '💬 שיחה אישית חדשה')
     ]));
 
+    var openN = openFollowUps().length;
     root.appendChild(U.el('div', { class: 'subtabs' }, [
       U.el('button', { class: sub === 'students' ? 'active' : '', onclick: function () { sub = 'students'; App.render(); } }, 'גיליון תלמידים'),
+      U.el('button', { class: sub === 'followups' ? 'active' : '', onclick: function () { sub = 'followups'; App.render(); } }, (openN ? '⚠️ ' : '') + 'מעקבים פתוחים (' + openN + ')'),
       U.el('button', { class: sub === 'conversations' ? 'active' : '', onclick: function () { sub = 'conversations'; App.render(); } }, 'שיחות אישיות (' + myConversations().length + ')')
     ]));
 
     if (sub === 'students') renderStudentsSheet(root);
+    else if (sub === 'followups') renderFollowUps(root);
     else renderConversations(root);
+  }
+
+  // ---------- מעקבים פתוחים ----------
+  function renderFollowUps(root) {
+    var list = openFollowUps();
+    if (!list.length) {
+      root.appendChild(U.el('div', { class: 'card empty' }, '🎉 אין מעקבים פתוחים — כל השיחות שדרשו המשך טופלו.'));
+      return;
+    }
+    root.appendChild(U.el('p', { class: 'muted', style: 'margin-top:0;font-size:13px;', text: 'שיחות שסומנו "נדרש מעקב / המשך טיפול" וממתינות לסגירה. אחרי הטיפול — מסמנים "טופל".' }));
+    var rows = list.map(function (c) {
+      var stu = Store.getById('students', c.studentId);
+      var days = Math.floor((U.fromISO(U.todayISO()) - U.fromISO(c.date)) / 86400000);
+      return U.el('tr', null, [
+        U.el('td', { text: stu ? stu.name : '?' }),
+        U.el('td', null, [U.flagPill(c.flag)]),
+        U.el('td', { text: U.gregLabel(c.date) + (days > 7 ? ' ⚠️' : ''), title: 'לפני ' + days + ' ימים' }),
+        U.el('td', { style: 'max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;', text: c.summary || '' }),
+        U.el('td', { class: 'muted', style: 'font-size:12px;', text: c.byName || '' }),
+        U.el('td', { class: 'actions' }, [
+          U.el('button', { class: 'btn small secondary', onclick: function () { openConversationView(c); } }, 'פרטים'),
+          U.el('button', { class: 'btn small', onclick: function () { markFollowUpDone(c); } }, '✓ טופל')
+        ])
+      ]);
+    });
+    root.appendChild(U.el('table', { class: 'grid' }, [
+      U.el('thead', null, [U.el('tr', null, [
+        U.el('th', { text: 'תלמיד' }), U.el('th', { text: 'רמזור' }), U.el('th', { text: 'תאריך השיחה' }),
+        U.el('th', { text: 'סיכום' }), U.el('th', { text: 'מדריך' }), U.el('th', { text: '' })
+      ])]),
+      U.el('tbody', null, rows)
+    ]));
   }
 
   // ---------- גיליון התלמידים (רמזור) ----------
   function renderStudentsSheet(root) {
     var students = visibleStudents();
     if (!students.length) { root.appendChild(U.el('div', { class: 'card empty' }, 'אין תלמידים.')); return; }
+
+    // התקדמות שיחות לפי מדריך (מנהל): כמה מתלמידי הכיתה קיבלו שיחה בתוך חלון היעד
+    if (Store.isAdmin()) {
+      var gd = goalDays();
+      var madrichim = (Store.core().staff || []).filter(function (s) { return s.active !== false && s.role === 'madrich' && s.classId; });
+      if (madrichim.length) {
+        var card = U.el('div', { class: 'card', style: 'margin-bottom:14px;' });
+        card.appendChild(U.el('h3', { style: 'margin:0 0 4px;color:var(--brand-dark);font-size:15px;', text: '🎯 יעד שיחות — שיחה לכל תלמיד כל ' + gd + ' ימים' }));
+        card.appendChild(U.el('div', { class: 'muted', style: 'font-size:12px;margin-bottom:10px;', text: 'ניתן לשנות את היעד בהגדרות.' }));
+        var chart = U.el('div', { class: 'cls-chart', style: 'max-width:none;margin:0;' });
+        madrichim.forEach(function (m) {
+          var stus = students.filter(function (s) { return s.classId === m.classId; });
+          if (!stus.length) return;
+          var inGoal = stus.filter(function (s) {
+            var lc = Store.lastConversation(s.id);
+            return lc && (U.fromISO(U.todayISO()) - U.fromISO(lc.date)) / 86400000 <= gd;
+          }).length;
+          var pct = Math.round(inGoal / stus.length * 100);
+          chart.appendChild(U.el('div', { class: 'cls-row' }, [
+            U.el('span', { class: 'cls-lbl', style: 'width:150px;', title: m.name, text: m.name + ' · ' + (global.ClassName ? ClassName(m.classId) : '') }),
+            U.el('div', { class: 'cls-track' }, [U.el('div', { class: 'cls-fill', style: 'width:' + pct + '%;background:' + (pct === 100 ? 'var(--ok)' : (pct < 50 ? 'var(--warn)' : 'var(--brand)')) + ';' })]),
+            U.el('span', { class: 'cls-val', text: inGoal + '/' + stus.length })
+          ]));
+        });
+        card.appendChild(chart);
+        root.appendChild(card);
+      }
+    }
 
     // סינון רמזור
     var counts = { green: 0, orange: 0, red: 0, none: 0 };
@@ -88,7 +173,7 @@
         U.el('td', { text: st30.pct == null ? '—' : st30.pct + '%' }),
         U.el('td', null, [
           lastConv
-            ? U.el('span', { text: U.gregLabel(lastConv.date) + (daysSince > 30 ? ' ⚠️' : ''), title: daysSince + ' ימים' })
+            ? U.el('span', { text: U.gregLabel(lastConv.date) + (daysSince > goalDays() ? ' ⚠️' : ''), title: daysSince + ' ימים' })
             : U.el('span', { class: 'muted', text: 'טרם נערכה' })
         ]),
         U.el('td', { class: 'actions' }, [
@@ -122,18 +207,28 @@
     var noteInp = U.el('textarea', { rows: '2', style: 'width:100%;', placeholder: 'הערה קצרה (מה הרקע לסטטוס)' });
     noteInp.value = (stu.eduStatus && stu.eduStatus.note) || '';
 
+    // הערת מנהל חסויה — מוצגת ונערכת ע"י מנהל בלבד (הרשאת תצוגה)
+    var mgrInp = null;
+    if (Store.isAdmin()) {
+      mgrInp = U.el('textarea', { rows: '2', style: 'width:100%;', placeholder: 'הערה שרואה רק מנהל הפנימיה' });
+      mgrInp.value = stu.mgrNote || '';
+    }
+
     Modal.open('סטטוס חינוכי — ' + stu.name, U.el('div', null, [
       btnsWrap,
-      U.el('div', { class: 'field' }, [U.el('label', { text: 'הערה' }), noteInp])
+      U.el('div', { class: 'field' }, [U.el('label', { text: 'הערה' }), noteInp]),
+      mgrInp ? U.el('div', { class: 'field' }, [U.el('label', { text: '🔒 הערת מנהל (חסויה)' }), mgrInp]) : null
     ]), [
       { label: 'ביטול', class: 'secondary' },
       { label: 'הסרת סטטוס', class: 'secondary', onClick: function (close) {
         delete stu.eduStatus;
+        if (mgrInp) stu.mgrNote = mgrInp.value;
         Store.save('core'); close(); App.render();
       } },
       { label: 'שמירה', onClick: function (close) {
         if (!level) { U.toast('בחרו רמזור', 'error'); return; }
         stu.eduStatus = { level: level, note: noteInp.value, by: Store.myName(), at: new Date().toISOString() };
+        if (mgrInp) stu.mgrNote = mgrInp.value;
         Store.save('core'); close(); App.render();
         U.toast('הסטטוס של ' + stu.name + ' עודכן');
       } }
@@ -190,7 +285,7 @@
         U.el('td', { text: stu ? stu.name : '?' }),
         U.el('td', null, [U.flagPill(c.flag)]),
         U.el('td', { style: 'max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;', text: c.summary || '' }),
-        U.el('td', { text: c.followUp ? '⚠️ כן' : '' }),
+        U.el('td', { text: c.followUp ? (c.followUpDone ? '✓ טופל' : '⚠️ פתוח') : '' }),
         U.el('td', { class: 'muted', style: 'font-size:12px;', text: c.byName || '' }),
         U.el('td', { class: 'actions' }, [
           U.el('button', { class: 'btn small secondary', onclick: function () { openConversationView(c); } }, 'פרטים')
@@ -326,7 +421,9 @@
         U.el('b', { text: stu ? stu.name : '?' }),
         U.flagPill(conv.flag),
         U.el('span', { class: 'muted', text: U.weekdayName(conv.date) + ' · ' + U.gregLabel(conv.date) + ' · ' + (conv.byName || '') }),
-        conv.followUp ? U.el('span', { class: 'tl tl-orange', text: '⚠️ נדרש מעקב' }) : null
+        conv.followUp ? (conv.followUpDone
+          ? U.el('span', { class: 'tl tl-green', title: 'טופל ע"י ' + (conv.followUpDoneBy || ''), text: '✓ המעקב טופל' })
+          : U.el('span', { class: 'tl tl-orange', text: '⚠️ מעקב פתוח' })) : null
       ])
     ].concat(qRows).concat([
       conv.summary ? U.el('div', { style: 'margin-top:10px;' }, [
@@ -336,7 +433,8 @@
     ]));
     var canEdit = Store.isAdmin() || (conv.by || '').toLowerCase() === Store.currentEmail();
     var btns = [{ label: 'סגור', class: 'secondary' }];
-    if (canEdit) btns.push({ label: '✏️ עריכה', onClick: function (close) { close(); openConversationForm(conv.studentId, conv); } });
+    if (conv.followUp && !conv.followUpDone) btns.push({ label: '✓ סמן מעקב כטופל', onClick: function (close) { close(); markFollowUpDone(conv); } });
+    if (canEdit) btns.push({ label: '✏️ עריכה', class: conv.followUp && !conv.followUpDone ? 'secondary' : '', onClick: function (close) { close(); openConversationForm(conv.studentId, conv); } });
     if (stu) btns.push({ label: '🚦 עדכון סטטוס', class: 'secondary', onClick: function (close) { close(); openStatusDialog(stu); } });
     Modal.open('שיחה אישית — ' + (stu ? stu.name : ''), body, btns);
   }

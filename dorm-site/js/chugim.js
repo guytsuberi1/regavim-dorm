@@ -22,6 +22,17 @@
     return s ? s.name : '—';
   }
 
+  // תזכורת וואטסאפ למדריך חוג שטרם דיווח
+  function sendReminder(c) {
+    var s = c.instructorStaffId ? Store.getById('staff', c.instructorStaffId) : null;
+    var wn = s ? U.waNumber(s.phone) : null;
+    if (!wn) { U.toast('למדריך החוג אין מספר טלפון בנתוני בסיס', 'error'); return; }
+    var msg = 'היי ' + s.name + ', תזכורת קטנה 🙂\n' +
+      'נשמח שתמלא את דיווח הנוכחות לחוג "' + c.name + '" של היום.\n' +
+      'הקישור: ' + location.origin + location.pathname;
+    window.open('https://wa.me/' + wn + '?text=' + encodeURIComponent(msg), '_blank');
+  }
+
   function render(root) {
     var role = Store.currentRole();
     var mine = myChugim();
@@ -78,8 +89,9 @@
           U.el('td', null, [U.el('span', { class: 'ds-report ' + (rep ? 'done' : 'wait'), text: rep ? '✓ דווח' : 'ממתין לדיווח' })]),
           U.el('td', { text: rep ? (present + '/' + (c.studentIds || []).length + ' נכחו') : '' }),
           U.el('td', { text: rep && rep.rating ? '★ ' + rep.rating : '' }),
-          U.el('td', null, [
-            Store.isAdmin() || rep ? U.el('button', { class: 'btn small secondary', onclick: function () { openReportView(c, today, rep); } }, rep ? 'צפייה' : 'דיווח') : null
+          U.el('td', { class: 'actions' }, [
+            Store.isAdmin() || rep ? U.el('button', { class: 'btn small secondary', onclick: function () { openReportView(c, today, rep); } }, rep ? 'צפייה' : 'דיווח') : null,
+            !rep && Store.isAdmin() ? U.el('button', { class: 'btn small ico', style: 'background:#25D366;color:#fff;', title: 'תזכורת וואטסאפ למדריך החוג', onclick: function () { sendReminder(c); }, html: U.WA_SVG }) : null
           ])
         ]);
       });

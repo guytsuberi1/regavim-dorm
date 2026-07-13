@@ -216,6 +216,28 @@
     return wrap;
   }
 
+  // ---------- גרף עמודות מגמה ----------
+  // cols: [{ label, pct (0-100), text, title?, cur?: bool }]
+  function trendChart(cols) {
+    return el('div', { class: 'trend' }, cols.map(function (c) {
+      return el('div', { class: 'trend-col', title: c.title || '' }, [
+        el('span', { class: 'trend-val' + (c.cur ? ' cur' : ''), text: c.text == null ? '' : String(c.text) }),
+        el('div', { class: 'trend-bar' + (c.cur ? ' cur' : ''), style: 'height:' + Math.max(2, Math.min(100, c.pct)) + '%;' }),
+        el('span', { class: 'trend-lbl' + (c.cur ? ' cur' : ''), text: c.label })
+      ]);
+    }));
+  }
+
+  // מספר וואטסאפ בינלאומי מטלפון ישראלי
+  function waNumber(phone) {
+    var d = String(phone || '').replace(/\D/g, '');
+    if (!d) return null;
+    if (d.indexOf('972') === 0) return d;
+    if (d.charAt(0) === '0') return '972' + d.slice(1);
+    if (d.length === 9) return '972' + d;
+    return d;
+  }
+
   global.U = {
     el: el, clear: clear, $: $, $all: $all,
     todayISO: todayISO, toISO: toISO, fromISO: fromISO, addDays: addDays,
@@ -225,6 +247,7 @@
     ATT_STATUSES: ATT_STATUSES, attLabel: attLabel,
     FLAGS: FLAGS, flagPill: flagPill,
     num: num, WA_SVG: WA_SVG, XLS_SVG: XLS_SVG,
-    toast: toast, dateChip: dateChip, actionMenu: actionMenu
+    toast: toast, dateChip: dateChip, actionMenu: actionMenu,
+    trendChart: trendChart, waNumber: waNumber
   };
 })(window);

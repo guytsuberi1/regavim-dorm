@@ -190,10 +190,12 @@
 
     var noteBtn = U.el('button', { class: 'btn small secondary no-print', title: 'הערה', disabled: !!readOnly, onclick: function () { openNote(stu, syncRow); } }, '📝');
 
+    var streak = Store.absStreak(stu.id);
     row.appendChild(U.el('div', { class: 'fstu-line' }, [
       U.el('div', { class: 'fstu-name' }, [
         U.el('span', { text: stu.name + '  ' }),
-        global.ClassBadge ? ClassBadge(stu.classId) : null
+        global.ClassBadge ? ClassBadge(stu.classId) : null,
+        streak >= 2 ? U.el('span', { class: 'tl tl-red', style: 'margin-inline-start:6px;', title: 'נעדר ' + streak + ' ערבים ברצף', text: '⚠️ ' + streak + ' ברצף' }) : null
       ]),
       U.el('div', { class: 'fstu-controls' }, [btnGroup, noteBtn])
     ]));
