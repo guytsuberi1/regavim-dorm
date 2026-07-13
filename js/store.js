@@ -67,6 +67,7 @@
     for (var k in def) { if (!(k in core)) core[k] = def[k]; }
     if (!core.settings.dormDays) core.settings.dormDays = [0, 1, 2, 3];
     if (!core.settings.convQuestions || !core.settings.convQuestions.length) core.settings.convQuestions = defaultQuestions();
+    if (!core.settings.convGoalDays) core.settings.convGoalDays = 30; // יעד: שיחה אישית לכל תלמיד כל X ימים
     return core;
   }
 
@@ -409,6 +410,19 @@
     return { total: total, present: present, pct: total ? Math.round(present / total * 100) : null, byStatus: byStatus };
   }
 
+  // רצף היעדרויות נוכחי: כמה ימים רצופים (מהיום המסומן האחרון אחורה) התלמיד "נעדר"
+  function absStreak(studentId) {
+    var dates = Object.keys(data.att).sort().reverse();
+    var streak = 0;
+    for (var i = 0; i < dates.length; i++) {
+      var m = data.att[dates[i]].marks[studentId];
+      if (!m) { if (streak === 0) continue; break; } // מדלג על ימים שטרם סומן בהם, עד הסימון האחרון
+      if (m.st === 'absent') streak++;
+      else break;
+    }
+    return streak;
+  }
+
   // ---------- דיווחי חוגים ----------
   function upsertReport(report) {
     if (!report.id) report.id = uid();
@@ -681,6 +695,7 @@
     saveAtt: saveAtt,
     setMark: setMark,
     attStats: attStats,
+    absStreak: absStreak,
     // חוגים
     upsertReport: upsertReport,
     reportFor: reportFor,

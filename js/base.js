@@ -213,6 +213,7 @@
   function openStudentCard(stu) {
     var st = Store.attStats(stu.id, 30);
     var lastConv = Store.lastConversation(stu.id);
+    var streak = Store.absStreak(stu.id);
     function row(label, val) {
       return U.el('div', { style: 'display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px solid var(--border);align-items:center;' },
         [U.el('span', { class: 'muted', text: label }), typeof val === 'string' ? U.el('span', { style: 'font-weight:600;', text: val }) : val]);
@@ -224,11 +225,60 @@
       row('הורה', (stu.parentName || '') + (stu.parentPhone ? ' · ' + stu.parentPhone : '') || '—'),
       row('סטטוס חינוכי', U.flagPill(stu.eduStatus && stu.eduStatus.level)),
       row('נוכחות 30 יום', st.pct == null ? 'אין נתונים' : st.pct + '% (' + st.present + '/' + st.total + ')'),
+      streak >= 2 ? row('היעדרות רצופה', U.el('span', { class: 'tl tl-red', text: '⚠️ ' + streak + ' ערבים ברצף' })) : null,
       row('שיחה אחרונה', lastConv ? U.gregLabel(lastConv.date) + ' · ' + (lastConv.byName || '') : 'טרם נערכה'),
-      stu.notes ? row('הערות', stu.notes) : null
+      stu.notes ? row('הערות', stu.notes) : null,
+      (Store.isAdmin() && stu.mgrNote) ? row('🔒 הערת מנהל', stu.mgrNote) : null
     ]);
     Modal.open('כרטיס תלמיד — ' + stu.name, body, [
+      { label: '🕒 ציר זמן', class: 'secondary', onClick: function (close) { close(); openStudentTimeline(stu); } },
       { label: 'עריכה', class: 'secondary', onClick: function (close) { close(); openForm(stu); } },
+      { label: 'סגור' }
+    ]);
+  }
+
+  // ---------- ציר זמן לתלמיד: היעדרויות + שיחות + עדכוני סטטוס, כרונולוגית ----------
+  function openStudentTimeline(stu) {
+    var events = [];
+    // אירועי נוכחות (כל מה שאינו "נוכח")
+    var att = Store.get().att;
+    Object.keys(att).forEach(function (d) {
+      var m = att[d].marks[stu.id];
+      if (!m || m.st === 'present') return;
+      var icons = { absent: '❌', home: '🏠', sick: '🤒' };
+      events.push({ date: d, icon: icons[m.st] || '❔', text: U.attLabel(m.st) + (m.note ? ' — ' + m.note : ''), sub: 'סומן ע"י ' + (m.by || '') });
+    });
+    // שיחות אישיות
+    (Store.get().edu.conversations || []).forEach(function (c) {
+      if (c.studentId !== stu.id) return;
+      events.push({ date: c.date, icon: '💬', flag: c.flag,
+        text: 'שיחה אישית' + (c.summary ? ' — ' + c.summary : ''),
+        sub: (c.byName || '') + (c.followUp ? (c.followUpDone ? ' · מעקב טופל ✓' : ' · מעקב פתוח ⚠️') : '') });
+    });
+    // עדכון הסטטוס הנוכחי
+    if (stu.eduStatus && stu.eduStatus.at) {
+      events.push({ date: String(stu.eduStatus.at).slice(0, 10), icon: '🚦', flag: stu.eduStatus.level,
+        text: 'עדכון סטטוס חינוכי' + (stu.eduStatus.note ? ' — ' + stu.eduStatus.note : ''), sub: stu.eduStatus.by || '' });
+    }
+    events.sort(function (a, b) { return String(b.date).localeCompare(String(a.date)); });
+    events = events.slice(0, 40);
+
+    var body = U.el('div', null, events.length ? events.map(function (ev) {
+      return U.el('div', { style: 'display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);align-items:flex-start;' }, [
+        U.el('span', { style: 'font-size:18px;flex:0 0 auto;', text: ev.icon }),
+        U.el('div', { style: 'min-width:0;flex:1;' }, [
+          U.el('div', { style: 'display:flex;gap:8px;align-items:center;flex-wrap:wrap;' }, [
+            U.el('b', { style: 'font-size:13px;', text: U.weekdayName(ev.date) + ' · ' + U.gregLabel(ev.date) }),
+            ev.flag ? U.flagPill(ev.flag) : null
+          ]),
+          U.el('div', { style: 'font-size:14px;line-height:1.5;white-space:pre-wrap;', text: ev.text }),
+          ev.sub ? U.el('div', { class: 'muted', style: 'font-size:11.5px;', text: ev.sub }) : null
+        ])
+      ]);
+    }) : [U.el('div', { class: 'empty', text: 'אין עדיין אירועים — התלמיד נוכח תמיד ולא תועדו שיחות 🙂' })]);
+
+    Modal.open('🕒 ציר זמן — ' + stu.name, body, [
+      { label: '↩ חזרה לכרטיס', class: 'secondary', onClick: function (close) { close(); openStudentCard(stu); } },
       { label: 'סגור' }
     ]);
   }

@@ -59,6 +59,10 @@
       daysWrap.appendChild(U.el('label', { style: 'display:inline-flex;align-items:center;gap:4px;cursor:pointer;font-size:13.5px;border:1px solid var(--border);border-radius:8px;padding:5px 9px;margin:0;' }, [chk, U.el('span', { text: U.WEEKDAYS[day] })]));
     });
 
+    // יעד שיחות אישיות — שיחה לכל תלמיד כל X ימים
+    var goalInp = U.el('input', { type: 'number', min: '1', value: U.num(core.settings.convGoalDays, 30) || 30, style: 'width:70px;' });
+    goalInp.addEventListener('change', function () { core.settings.convGoalDays = Math.max(1, U.num(goalInp.value, 30)); Store.save('core'); });
+
     root.appendChild(U.el('div', { class: 'card', style: 'margin-bottom:16px;max-width:560px;' }, [
       U.el('h3', { style: 'margin-top:0;', text: 'הגדרות כלליות' }),
       U.el('div', { class: 'field' }, [U.el('label', { text: 'שם המוסד' }), nameInp]),
@@ -66,6 +70,13 @@
       U.el('div', { class: 'field' }, [
         U.el('label', { text: 'ימי זמן פנימיה (מילוי נוכחות)' }), daysWrap,
         U.el('div', { class: 'muted', style: 'font-size:12px;margin-top:4px;', text: 'בימים אלו נפתח גיליון נוכחות; אפשר לסמן גם בימים אחרים במקרה חריג.' })
+      ]),
+      U.el('div', { class: 'field' }, [
+        U.el('label', { text: '🎯 יעד שיחות אישיות' }),
+        U.el('div', { style: 'display:flex;align-items:center;gap:8px;flex-wrap:wrap;' }, [
+          U.el('span', { text: 'שיחה אישית לכל תלמיד כל' }), goalInp, U.el('span', { text: 'ימים' })
+        ]),
+        U.el('div', { class: 'muted', style: 'font-size:12px;margin-top:4px;', text: 'קובע את ההתראות בדשבורד ואת פסי ההתקדמות של המדריכים בגיליון חינוך תלמידים.' })
       ])
     ]));
 
