@@ -11,7 +11,9 @@
   var STORAGE_KEY = 'regavim_dorm_v1';
 
   // ---------- מבנה ברירת מחדל ----------
-  function newMeta() { return { version: 1, lastModified: new Date().toISOString() }; }
+  // חותמת אפס: מאגר ברירת-מחדל (ריק) לעולם לא "חדש יותר" מנתונים אמיתיים בענן.
+  // save() מטביע זמן אמיתי בכל שמירה.
+  function newMeta() { return { version: 1, lastModified: '1970-01-01T00:00:00.000Z' }; }
 
   function defaultQuestions() {
     return [
@@ -272,7 +274,13 @@
       return true;
     }
 
-    // core — החלפה מלאה, החדש מנצח (כתיבה נדירה של המנהל)
+    // core — החלפה מלאה, החדש מנצח (כתיבה נדירה של המנהל).
+    // הגנה קשיחה: לעולם לא מחליפים ליבה עם תוכן אמיתי בליבה ריקה —
+    // מונע מדפדפן "טרי" (ללא נתונים מקומיים) לדרוס את נתוני הענן.
+    if (coreHasContent(local) && !coreHasContent(incoming) && !incoming.wipedAt) {
+      if (initial) scheduleCloudSave(rowId); // הצד שלנו מלא והענן ריק — משחזרים את הענן
+      return false;
+    }
     if (local && metaTs(local) > metaTs(incoming)) {
       if (!initial) return false;
       // בטעינה ראשונית המידע המקומי חדש יותר — נדחוף אותו לענן
@@ -282,6 +290,13 @@
     if (jsonEq(local, incoming)) return false;
     rowSet(rowId, incoming);
     return true;
+  }
+
+  // האם יש בליבה תוכן אמיתי (תלמידים/צוות/חוגים) — כיתות ושאלון קיימים גם בברירת מחדל
+  function coreHasContent(c) {
+    return !!(c && ((c.students && c.students.length) ||
+                    (c.staff && c.staff.length) ||
+                    (c.chugim && c.chugim.length)));
   }
 
   // ---------- ענן: טעינה ורילטיים ----------
