@@ -136,7 +136,9 @@
       Modal.confirm({ title: '⚠ מחיקת כל הנתונים', text: 'כל הנתונים יימחקו — תלמידים, נוכחות, חוגים, שיחות והכל.\nבטוחים?', okLabel: 'המשך', danger: true }, function () {
         Modal.confirm({ title: '⚠ אזהרה אחרונה', text: 'הפעולה בלתי הפיכה.\nקובץ גיבוי מלא יירד אוטומטית לפני המחיקה — שמרו אותו במקום בטוח.\nלמחוק את הכל?', okLabel: 'מחק את הכל', danger: true }, function () {
           try { Store.exportJSON(); } catch (e) {}
-          Store.replaceAll(Store.defaultData());
+          var fresh = Store.defaultData();
+          fresh.core.wipedAt = new Date().toISOString(); // מחיקה מכוונת — עוקפת את ההגנה מפני דריסה בליבה ריקה
+          Store.replaceAll(fresh);
           Store.saveAllRows();
           App.render();
           U.toast('כל הנתונים נמחקו', 'info');
