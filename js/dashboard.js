@@ -18,11 +18,15 @@
       U.el('h2', { text: '📊 דשבורד' }),
       U.dateChip(U.weekdayName(today) + ' · ' + U.gregLabel(today) + ' · ' + U.hebrewDate(today), null, { title: 'היום' }),
       U.el('div', { class: 'spacer' }),
+      U.el('button', { class: 'btn accent', onclick: function () { if (global.EmergencyRoster) EmergencyRoster(today); } }, '🚨 מצבת חירום'),
       U.actionMenu([
         { html: U.WA_SVG, label: 'סיכום ערב לוואטסאפ', onClick: function () { sendSummaryWhatsApp(); } },
         { icon: '📋', label: 'העתקת סיכום הערב', onClick: function () { copySummary(); } }
       ])
     ]));
+
+    // ---------- התראות סגירת לילה ----------
+    buildCloseAlerts(root, students);
 
     if (!students.length) {
       root.appendChild(U.el('div', { class: 'card empty' }, [
@@ -87,17 +91,103 @@
       root.appendChild(trendPanel);
     }
 
-    // ---------- שתי עמודות: נוכחות לפי כיתה + חוגים היום ----------
+    // ---------- מצבת שבת (שישי) ----------
+    if (U.fromISO(today).getDay() === 5) {
+      var shPanel = buildShabbatPanel(today, students);
+      if (shPanel) root.appendChild(shPanel);
+    }
+
+    // ---------- שתי עמודות: הערב בפנימיה + חוגים היום ----------
     var cols = U.el('div', { class: 'dash-cols' });
-    cols.appendChild(buildClassPanel(students, marks));
+    cols.appendChild(buildTonightPanel(students, marks));
     cols.appendChild(buildChugPanel());
     root.appendChild(cols);
 
-    // ---------- שתי עמודות: חינוך תלמידים + תחזוקה ----------
+    // ---------- שתי עמודות: נוכחות לפי כיתה + חינוך תלמידים ----------
     var cols2 = U.el('div', { class: 'dash-cols' });
+    cols2.appendChild(buildClassPanel(students, marks));
     cols2.appendChild(buildEduPanel(students));
-    cols2.appendChild(buildMaintPanel());
     root.appendChild(cols2);
+
+    // ---------- תחזוקה (placeholder) ----------
+    root.appendChild(buildMaintPanel());
+  }
+
+  // התראות סגירת לילה: אתמול/יום פעילות קודם שלא נסגר, והיום אם עברה שעת הסגירה
+  function buildCloseAlerts(root, students) {
+    var alerts = [];
+    var settings = Store.core().settings || {};
+    var dormDays = settings.dormDays || [0, 1, 2, 3];
+    var today = U.todayISO();
+    // יום הפעילות הקודם
+    var prev = null;
+    for (var i = 1; i <= 7; i++) {
+      var d = U.addDays(today, -i);
+      if (dormDays.indexOf(U.fromISO(d).getDay()) !== -1) { prev = d; break; }
+    }
+    if (prev) {
+      var ps = Store.attFor(prev, false);
+      if (!ps) alerts.push('⚠️ ' + U.weekdayName(prev) + ' (' + U.gregLabel(prev) + ') — לא בוצע סימון נוכחות כלל');
+      else if (ps.status !== 'closed') alerts.push('⚠️ ' + U.weekdayName(prev) + ' (' + U.gregLabel(prev) + ') — הנוכחות לא נסגרה');
+    }
+    // היום, אחרי שעת הסגירה
+    var isDormToday = dormDays.indexOf(U.fromISO(today).getDay()) !== -1;
+    if (isDormToday) {
+      var hour = new Date().getHours();
+      var ts = Store.attFor(today, false);
+      if (hour >= (settings.closeHour || 22) && (!ts || ts.status !== 'closed')) {
+        alerts.push('🔔 היום טרם בוצעה סגירת נוכחות של 22:30');
+      }
+    }
+    alerts.forEach(function (msg) {
+      root.appendChild(U.el('div', { class: 'card', style: 'margin-bottom:12px;background:#fee2e2;border:1px solid #fca5a5;color:#991b1b;font-weight:600;cursor:pointer;', onclick: function () { App.setTab('attendance'); } }, msg));
+    });
+  }
+
+  // כרטיס "הערב בפנימיה" — תעסוקת הערב לכל כיתה
+  function buildTonightPanel(students, marks) {
+    var today = U.todayISO();
+    var panel = U.el('div', { class: 'dash-panel' });
+    panel.appendChild(U.el('div', { class: 'dash-panel-head' }, [
+      U.el('h3', { text: '🗓️ הערב בפנימיה' }),
+      U.el('button', { class: 'btn small secondary', onclick: function () { App.setTab('evening'); } }, 'לתכנית ←')
+    ]));
+    var classes = (Store.core().classes || []).filter(function (c) { return c.active !== false; });
+    var any = false;
+    classes.forEach(function (c) {
+      var stus = students.filter(function (s) { return s.classId === c.id; });
+      if (!stus.length) return;
+      var actId = Store.eveningActivityFor(today, c.id);
+      var def = actId ? Store.activityDef(actId) : null;
+      if (def) any = true;
+      panel.appendChild(U.el('div', { class: 'dash-row' }, [
+        U.el('span', { style: 'font-weight:600;min-width:60px;', text: c.name }),
+        U.el('span', { class: 'spacer' }),
+        def ? U.el('span', { class: 'ev-pill', style: 'background:' + def.color + ';color:#fff;', text: def.label }) : U.el('span', { class: 'muted', style: 'font-size:12.5px;', text: 'לא הוגדר' })
+      ]));
+    });
+    if (!any) panel.appendChild(U.el('div', { class: 'dash-empty', text: 'טרם הוגדרה תכנית ערב. מגדירים ב"תכנית ערב".' }));
+    return panel;
+  }
+
+  // כרטיס מצבת שבת (שישי)
+  function buildShabbatPanel(friday, students) {
+    var sh = Store.shabbatFor(friday);
+    var panel = U.el('div', { class: 'dash-panel', style: 'margin-bottom:18px;background:#fffdf5;border:1px solid #f0d79a;' });
+    panel.appendChild(U.el('div', { class: 'dash-panel-head' }, [
+      U.el('h3', { text: '🕯️ מצבת שבת' }),
+      U.el('button', { class: 'btn small secondary', onclick: function () { App.setTab('roster'); } }, 'לעריכה ←')
+    ]));
+    if (!sh || !(sh.stayingIds || []).length) {
+      panel.appendChild(U.el('div', { class: 'dash-empty', text: 'טרם הוגדרה רשימת נשארים לשבת. מגדירים במסך "מצבת ויציאות".' }));
+      return panel;
+    }
+    var names = sh.stayingIds.map(function (id) { var s = Store.getById('students', id); return s ? s.name : null; }).filter(Boolean);
+    panel.appendChild(U.el('div', { style: 'font-size:14px;line-height:1.7;' }, [
+      U.el('b', { text: names.length + ' נשארים בשבת: ' }),
+      U.el('span', { text: names.join(' · ') })
+    ]));
+    return panel;
   }
 
   // נוכחות לפי כיתה

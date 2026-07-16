@@ -55,17 +55,89 @@
       return;
     }
 
-    // מנהל/מדריך — סטטוס היום + היסטוריה (+ דיווח ידני למנהל)
+    // מנהל/מדריך — סטטוס היום + ניתוח + היסטוריה (+ דיווח ידני למנהל)
     var tabs = [
       U.el('button', { class: sub === 'today' ? 'active' : '', onclick: function () { sub = 'today'; App.render(); } }, 'סטטוס היום'),
+      U.el('button', { class: sub === 'analysis' ? 'active' : '', onclick: function () { sub = 'analysis'; App.render(); } }, '📊 ניתוח חוגים'),
       U.el('button', { class: sub === 'history' ? 'active' : '', onclick: function () { sub = 'history'; App.render(); } }, 'היסטוריית דיווחים')
     ];
     if (mine.length) tabs.unshift(U.el('button', { class: sub === 'report' ? 'active' : '', onclick: function () { sub = 'report'; App.render(); } }, 'החוגים שלי'));
     root.appendChild(U.el('div', { class: 'subtabs' }, tabs));
 
     if (sub === 'report' && mine.length) renderMyChugim(root, mine);
+    else if (sub === 'analysis') renderAnalysis(root);
     else if (sub === 'history') renderHistory(root);
     else renderTodayStatus(root);
+  }
+
+  // ---------- ניתוח חוגים: בסיס להחלטת המשך ----------
+  function renderAnalysis(root) {
+    root.appendChild(U.el('p', { class: 'muted', style: 'margin-top:0;', text: 'סיכום ביצועי כל חוג — בסיס להחלטה אם להמשיך איתו. מבוסס על כל הדיווחים שהוזנו.' }));
+    var chugim = activeChugim();
+    var reports = Store.get().chug.reports || [];
+
+    chugim.forEach(function (c) {
+      var reps = reports.filter(function (r) { return r.chugId === c.id; })
+        .sort(function (a, b) { return String(a.date).localeCompare(String(b.date)); });
+      var rosterN = (c.studentIds || []).length;
+
+      // אחוז התייצבות ממוצע ודירוג ממוצע
+      var attSum = 0, attCnt = 0, rateSum = 0, rateCnt = 0;
+      reps.forEach(function (r) {
+        var present = Object.keys(r.marks || {}).filter(function (k) { return r.marks[k] === 'present'; }).length;
+        if (rosterN) { attSum += present / rosterN; attCnt++; }
+        if (r.rating) { rateSum += r.rating; rateCnt++; }
+      });
+      var avgAtt = attCnt ? Math.round(attSum / attCnt * 100) : null;
+      var avgRate = rateCnt ? (rateSum / rateCnt).toFixed(1) : null;
+
+      // כמה מפגשים היו אמורים להתקיים (ימי הפעילות שחלפו) מול כמה דווחו
+      var planned = countPlannedSessions(c);
+
+      var card = U.el('div', { class: 'card', style: 'margin-bottom:12px;' });
+      card.appendChild(U.el('div', { style: 'display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;' }, [
+        U.el('h3', { style: 'margin:0;color:var(--brand-dark);', text: c.name }),
+        U.el('span', { class: 'muted', style: 'font-size:12.5px;', text: (rosterN + ' רשומים · ' + instructorName(c)) })
+      ]));
+      card.appendChild(U.el('div', { class: 'kpi-grid', style: 'margin:0;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));' }, [
+        miniKpi(avgAtt == null ? '—' : avgAtt + '%', 'התייצבות ממוצעת', avgAtt != null && avgAtt < 50 ? 'kpi-bad' : (avgAtt != null && avgAtt < 75 ? 'kpi-warn' : 'kpi-good')),
+        miniKpi(avgRate == null ? '—' : '★ ' + avgRate, 'דירוג ממוצע', avgRate != null && avgRate < 3 ? 'kpi-warn' : 'kpi-good'),
+        miniKpi(reps.length + '/' + planned, 'דווחו / מתוכננים', reps.length < planned * 0.7 ? 'kpi-warn' : 'kpi-info')
+      ]));
+      // גרף מגמת התייצבות
+      if (reps.length > 1 && rosterN) {
+        var cols = reps.slice(-12).map(function (r) {
+          var present = Object.keys(r.marks || {}).filter(function (k) { return r.marks[k] === 'present'; }).length;
+          var pct = Math.round(present / rosterN * 100);
+          return { label: U.gregLabel(r.date), pct: pct, text: pct + '%', title: U.gregLabel(r.date) + ' — ' + present + '/' + rosterN };
+        });
+        card.appendChild(U.el('div', { class: 'trend-scroll', style: 'margin-top:10px;' }, [U.trendChart(cols)]));
+      }
+      root.appendChild(card);
+    });
+    if (!chugim.length) root.appendChild(U.el('div', { class: 'card empty' }, 'אין חוגים.'));
+  }
+
+  function miniKpi(val, lbl, cls) {
+    return U.el('div', { class: 'kpi ' + (cls || 'kpi-neutral') }, [
+      U.el('div', { class: 'kpi-body' }, [
+        U.el('div', { class: 'kpi-row' }, [U.el('span', { class: 'kpi-val', text: String(val) })]),
+        U.el('div', { class: 'kpi-lbl', text: lbl })
+      ])
+    ]);
+  }
+
+  // כמה מפגשים היו אמורים להתקיים מאז הדיווח הראשון של החוג ועד היום
+  function countPlannedSessions(c) {
+    var reports = (Store.get().chug.reports || []).filter(function (r) { return r.chugId === c.id; })
+      .sort(function (a, b) { return String(a.date).localeCompare(String(b.date)); });
+    if (!reports.length || !(c.days || []).length) return Math.max(1, reports.length);
+    var start = reports[0].date, today = U.todayISO(), n = 0, d = start;
+    for (var i = 0; i < 400 && d <= today; i++) {
+      if ((c.days || []).indexOf(U.fromISO(d).getDay()) !== -1) n++;
+      d = U.addDays(d, 1);
+    }
+    return Math.max(n, reports.length);
   }
 
   // ---------- סטטוס היום (מנהל/מדריך) ----------

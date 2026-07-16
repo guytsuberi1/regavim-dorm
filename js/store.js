@@ -43,14 +43,28 @@
       ],
       students: [],  // { id, name, classId, room, building, phone, parentName, parentPhone, active, notes, eduStatus:{level,note,by,at} }
       staff: [],     // { id, name, email, phone, role:'admin'|'madrich'|'chug', classId, active }
-      chugim: []     // { id, name, instructorStaffId, days:[0..6], time, location, studentIds:[], active }
+      chugim: [],    // { id, name, instructorStaffId, days:[0..6], time, location, studentIds:[], active }
+      eveningPlan: {},   // { 'YYYY-MM-DD': { classId: activityId } }  שינוי חד-פעמי לתכנית ערב של יום מסוים
+      shabbat: {}        // { 'YYYY-MM-DD'(שישי): { stayingIds:[], note, by, at } }  מצבת שבת
     };
+  }
+
+  // סוגי תעסוקת ערב — ניתנים לעריכה בהגדרות
+  function defaultActivities() {
+    return [
+      { id: 'chug',      label: 'חוגים',          color: '#0d9488' },
+      { id: 'learning',  label: 'מרכז למידה',      color: '#2563eb' },
+      { id: 'mechanech', label: 'פעילות מחנך',     color: '#7c3aed' },
+      { id: 'madrich',   label: 'ערב מדריך',       color: '#d97706' },
+      { id: 'free',      label: 'ערב חופשי',       color: '#64748b' }
+    ];
   }
 
   function defaultData() {
     return {
       core: defaultCore(),
-      att: {},  // { 'YYYY-MM-DD': { date, status:'open'|'closed', marks:{studentId:{st,note,by,at}}, closedBy, closedAt, meta } }
+      att: {},  // { 'YYYY-MM-DD': { date, status:'open'|'closed', marks:{studentId:{st,note,by,at,handledAt,handledBy}}, closedBy, closedAt, meta } }
+      leave: {},// { 'YYYY-MM-DD': { date, entries:{studentId:{until,approvedBy,parentApproval,note,by,at}}, meta } }
       chug: { meta: newMeta(), reports: [] },      // { id, chugId, date, marks:{studentId:'present'|'absent'}, rating, note, by, at, updatedAt }
       edu:  { meta: newMeta(), conversations: [] } // { id, studentId, date, by, byName, answers:{qid:val}, summary, flag, updatedAt }
     };
@@ -70,6 +84,11 @@
     if (!core.settings.dormDays) core.settings.dormDays = [0, 1, 2, 3];
     if (!core.settings.convQuestions || !core.settings.convQuestions.length) core.settings.convQuestions = defaultQuestions();
     if (!core.settings.convGoalDays) core.settings.convGoalDays = 30; // יעד: שיחה אישית לכל תלמיד כל X ימים
+    if (core.settings.closeHour == null) core.settings.closeHour = 22;  // השעה שאחריה מוצגת התראת "יום טרם נסגר"
+    if (!core.settings.eveningActivities || !core.settings.eveningActivities.length) core.settings.eveningActivities = defaultActivities();
+    if (!core.settings.eveningTemplate) core.settings.eveningTemplate = {}; // { weekday: { classId: activityId } }
+    if (!core.eveningPlan) core.eveningPlan = {};
+    if (!core.shabbat) core.shabbat = {};
     return core;
   }
 
@@ -102,6 +121,7 @@
     if (rowId === 'chug') return data.chug;
     if (rowId === 'edu') return data.edu;
     if (rowId.indexOf('att:') === 0) return data.att[rowId.slice(4)] || null;
+    if (rowId.indexOf('leave:') === 0) return data.leave[rowId.slice(6)] || null;
     return null;
   }
   function rowSet(rowId, obj) {
@@ -109,10 +129,12 @@
     else if (rowId === 'chug') data.chug = obj;
     else if (rowId === 'edu') data.edu = obj;
     else if (rowId.indexOf('att:') === 0) data.att[rowId.slice(4)] = obj;
+    else if (rowId.indexOf('leave:') === 0) data.leave[rowId.slice(6)] = obj;
   }
   function allRowIds() {
     var ids = ['core', 'chug', 'edu'];
     Object.keys(data.att || {}).forEach(function (d) { ids.push('att:' + d); });
+    Object.keys(data.leave || {}).forEach(function (d) { ids.push('leave:' + d); });
     return ids;
   }
 
@@ -233,6 +255,23 @@
     return out;
   }
 
+  // מצבת יציאות: איחוד הרשומות לפי תלמיד — הרשומה החדשה (at) מנצחת
+  function mergeLeave(local, incoming) {
+    if (!local) return incoming;
+    if (!incoming) return local;
+    var out = { date: local.date || incoming.date, entries: {}, meta: metaTs(local) >= metaTs(incoming) ? local.meta : incoming.meta };
+    var keys = {};
+    Object.keys(local.entries || {}).forEach(function (k) { keys[k] = true; });
+    Object.keys(incoming.entries || {}).forEach(function (k) { keys[k] = true; });
+    Object.keys(keys).forEach(function (k) {
+      var a = (local.entries || {})[k], b = (incoming.entries || {})[k];
+      if (!a) { out.entries[k] = b; return; }
+      if (!b) { out.entries[k] = a; return; }
+      out.entries[k] = ts(a.at) >= ts(b.at) ? a : b;
+    });
+    return out;
+  }
+
   // אוספי רשומות (דיווחי חוגים / שיחות): איחוד לפי id — updatedAt חדש מנצח
   function mergeRecords(localArr, incomingArr) {
     var byId = {};
@@ -260,6 +299,14 @@
       rowSet(rowId, mergedAtt);
       // אם למקומי היו סימונים שהצד השני לא ראה — נדחוף את התוצאה הממוזגת חזרה לענן
       if (!jsonEq(mergedAtt, incoming)) scheduleCloudSave(rowId);
+      return true;
+    }
+
+    if (rowId.indexOf('leave:') === 0) {
+      var mergedLv = mergeLeave(local, incoming);
+      if (jsonEq(mergedLv, local)) return false;
+      rowSet(rowId, mergedLv);
+      if (!jsonEq(mergedLv, incoming)) scheduleCloudSave(rowId);
       return true;
     }
 
@@ -436,6 +483,82 @@
       else break;
     }
     return streak;
+  }
+
+  // סימון היעדרות שהועברה לטיפול מחנך (נשמר על הסימון עצמו)
+  function markHandled(date, studentId, on) {
+    var s = attFor(date, false);
+    if (!s || !s.marks[studentId]) return;
+    var m = s.marks[studentId];
+    if (on) { m.handledAt = new Date().toISOString(); m.handledBy = myName(); }
+    else { delete m.handledAt; delete m.handledBy; }
+    m.at = new Date().toISOString();
+    saveAtt(date);
+  }
+
+  // ---------- מצבת יציאות ----------
+  function leaveFor(date, create) {
+    var l = data.leave[date];
+    if (!l && create) { l = { date: date, entries: {}, meta: newMeta() }; data.leave[date] = l; }
+    return l || null;
+  }
+  function saveLeave(date) { save('leave:' + date); }
+
+  // רשומת יציאה פעילה של תלמיד ליום (לא כולל רשומות שבוטלו)
+  function leaveOf(date, studentId) {
+    var l = data.leave[date];
+    var e = l && l.entries && l.entries[studentId];
+    return (e && !e.canceled) ? e : null;
+  }
+
+  // קביעת/עדכון יציאה. data: {until, approvedBy, parentApproval, note}. ביטול: setLeave(date, id, null)
+  function setLeave(date, studentId, info) {
+    var l = leaveFor(date, true);
+    if (info == null) {
+      // ביטול — משאירים tombstone עם at חדש כדי שהביטול יסונכרן
+      if (l.entries[studentId]) { l.entries[studentId] = { canceled: true, by: myName(), at: new Date().toISOString() }; }
+    } else {
+      l.entries[studentId] = {
+        until: info.until || '', approvedBy: info.approvedBy || '', parentApproval: info.parentApproval || '',
+        note: info.note || '', by: myName(), at: new Date().toISOString()
+      };
+    }
+    saveLeave(date);
+    return l;
+  }
+
+  // כל היציאות הפעילות ליום — [{studentId, ...}]
+  function leavesOn(date) {
+    var l = data.leave[date];
+    if (!l || !l.entries) return [];
+    return Object.keys(l.entries).filter(function (id) { return !l.entries[id].canceled; })
+      .map(function (id) { var e = l.entries[id]; return { studentId: id, until: e.until, approvedBy: e.approvedBy, parentApproval: e.parentApproval, note: e.note, by: e.by }; });
+  }
+
+  // ---------- תכנית תעסוקת ערב ----------
+  // מזהה סוג הפעילות של כיתה בתאריך: שינוי חד-פעמי (eveningPlan) גובר על התבנית השבועית
+  function eveningActivityFor(date, classId) {
+    var over = (data.core.eveningPlan || {})[date];
+    if (over && over[classId] != null) return over[classId] || null;
+    var wd = String(U.fromISO(date).getDay());
+    var tmpl = (data.core.settings.eveningTemplate || {})[wd];
+    return (tmpl && tmpl[classId]) || null;
+  }
+  function activityDef(id) {
+    return (data.core.settings.eveningActivities || []).filter(function (a) { return a.id === id; })[0] || null;
+  }
+  function setEveningOverride(date, classId, activityId) {
+    if (!data.core.eveningPlan[date]) data.core.eveningPlan[date] = {};
+    data.core.eveningPlan[date][classId] = activityId || '';
+    save('core');
+  }
+  function clearEveningOverride(date) { delete data.core.eveningPlan[date]; save('core'); }
+
+  // ---------- מצבת שבת ----------
+  function shabbatFor(fridayDate) { return (data.core.shabbat || {})[fridayDate] || null; }
+  function setShabbat(fridayDate, stayingIds, note) {
+    data.core.shabbat[fridayDate] = { stayingIds: stayingIds || [], note: note || '', by: myName(), at: new Date().toISOString() };
+    save('core');
   }
 
   // ---------- דיווחי חוגים ----------
@@ -709,8 +832,22 @@
     attFor: attFor,
     saveAtt: saveAtt,
     setMark: setMark,
+    markHandled: markHandled,
     attStats: attStats,
     absStreak: absStreak,
+    // מצבת יציאות
+    leaveFor: leaveFor,
+    leaveOf: leaveOf,
+    setLeave: setLeave,
+    leavesOn: leavesOn,
+    // תכנית ערב
+    eveningActivityFor: eveningActivityFor,
+    activityDef: activityDef,
+    setEveningOverride: setEveningOverride,
+    clearEveningOverride: clearEveningOverride,
+    // מצבת שבת
+    shabbatFor: shabbatFor,
+    setShabbat: setShabbat,
     // חוגים
     upsertReport: upsertReport,
     reportFor: reportFor,
