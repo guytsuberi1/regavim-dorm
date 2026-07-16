@@ -63,6 +63,10 @@
     var goalInp = U.el('input', { type: 'number', min: '1', value: U.num(core.settings.convGoalDays, 30) || 30, style: 'width:70px;' });
     goalInp.addEventListener('change', function () { core.settings.convGoalDays = Math.max(1, U.num(goalInp.value, 30)); Store.save('core'); });
 
+    // שעת התראת סגירת לילה
+    var closeInp = U.el('input', { type: 'number', min: '0', max: '23', value: U.num(core.settings.closeHour, 22), style: 'width:64px;' });
+    closeInp.addEventListener('change', function () { core.settings.closeHour = Math.min(23, Math.max(0, U.num(closeInp.value, 22))); Store.save('core'); });
+
     root.appendChild(U.el('div', { class: 'card', style: 'margin-bottom:16px;max-width:560px;' }, [
       U.el('h3', { style: 'margin-top:0;', text: 'הגדרות כלליות' }),
       U.el('div', { class: 'field' }, [U.el('label', { text: 'שם המוסד' }), nameInp]),
@@ -70,6 +74,13 @@
       U.el('div', { class: 'field' }, [
         U.el('label', { text: 'ימי זמן פנימיה (מילוי נוכחות)' }), daysWrap,
         U.el('div', { class: 'muted', style: 'font-size:12px;margin-top:4px;', text: 'בימים אלו נפתח גיליון נוכחות; אפשר לסמן גם בימים אחרים במקרה חריג.' })
+      ]),
+      U.el('div', { class: 'field' }, [
+        U.el('label', { text: '🔔 התראת סגירת לילה' }),
+        U.el('div', { style: 'display:flex;align-items:center;gap:8px;flex-wrap:wrap;' }, [
+          U.el('span', { text: 'הצג התראה בדשבורד אם היום לא נסגר עד השעה' }), closeInp
+        ]),
+        U.el('div', { class: 'muted', style: 'font-size:12px;margin-top:4px;', text: 'בדרך כלל 22 (סגירת 22:30).' })
       ]),
       U.el('div', { class: 'field' }, [
         U.el('label', { text: '🎯 יעד שיחות אישיות' }),

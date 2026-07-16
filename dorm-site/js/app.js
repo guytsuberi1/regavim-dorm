@@ -6,6 +6,8 @@
   var TABS = {
     dashboard: global.DashboardView,
     attendance: global.AttendanceView,
+    roster: global.RosterView,
+    evening: global.EveningView,
     atthistory: global.AttHistoryView,
     chugim: global.ChugimView,
     education: global.EducationView,
@@ -18,8 +20,8 @@
   // הרשאות → אילו טאבים גלויים
   // admin=מנהל פנימיה (הכל) · madrich=מדריך · chug=מדריך חוג (דיווח חוגים בלבד)
   var ROLE_TABS = {
-    admin: ['dashboard', 'attendance', 'atthistory', 'chugim', 'education', 'base', 'settings'],
-    madrich: ['attendance', 'atthistory', 'chugim', 'education'],
+    admin: ['dashboard', 'attendance', 'roster', 'evening', 'atthistory', 'chugim', 'education', 'base', 'settings'],
+    madrich: ['attendance', 'roster', 'evening', 'atthistory', 'chugim', 'education'],
     chug: ['chugim']
   };
   function roleKey() { return Store.currentRole(); }
@@ -30,8 +32,15 @@
       var t = b.getAttribute('data-tab');
       b.style.display = allowed.indexOf(t) !== -1 ? '' : 'none';
     });
-    // כותרות הנושאים בסרגל — רק למי שרואה כמה טאבים
-    U.$all('#tabs .nav-sec').forEach(function (d) { d.style.display = (role === 'admin' || role === 'madrich') ? '' : 'none'; });
+    // כותרת נושא בסרגל מוצגת רק אם יש תחתיה לפחות טאב אחד גלוי
+    U.$all('#tabs .nav-sec').forEach(function (d) {
+      var anyVisible = false, n = d.nextElementSibling;
+      while (n && !n.classList.contains('nav-sec')) {
+        if (n.tagName === 'BUTTON' && n.style.display !== 'none') { anyVisible = true; break; }
+        n = n.nextElementSibling;
+      }
+      d.style.display = anyVisible ? '' : 'none';
+    });
     if (allowed.indexOf(current) === -1) current = allowed[0];
   }
 

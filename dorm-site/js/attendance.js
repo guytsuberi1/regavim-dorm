@@ -93,6 +93,18 @@
       })));
     root.appendChild(clsTabs);
 
+    // ---------- תעסוקת הערב של הכיתה ----------
+    if (selClass) {
+      var actId = Store.eveningActivityFor(attDate, selClass);
+      var def = actId ? Store.activityDef(actId) : null;
+      if (def) {
+        root.appendChild(U.el('div', { style: 'margin-bottom:10px;' }, [
+          U.el('span', { class: 'muted', style: 'font-size:13px;', text: 'תעסוקת הערב: ' }),
+          U.el('span', { class: 'ev-pill', style: 'background:' + def.color + ';color:#fff;', text: def.label })
+        ]));
+      }
+    }
+
     // ---------- פס התקדמות חי ----------
     var progWrap = U.el('div', { class: 'fprog' });
     function updateProgress() {
@@ -155,9 +167,11 @@
   function buildStudentRow(stu, readOnly) {
     var session = Store.attFor(attDate, false);
     var mark = session && session.marks[stu.id];
+    var leave = Store.leaveOf(attDate, stu.id);
 
     var row = U.el('div', { class: 'field-student' });
     var byLine = U.el('div', { class: 'fstu-by' });
+    var flagLine = U.el('div', { class: 'fstu-by' }); // שורת התראות/פעולות (אי-התאמה, טיפול מחנך)
 
     var btns = {};
     function syncRow() {
@@ -172,6 +186,23 @@
       row.classList.toggle('sick', !!(m && m.st === 'sick'));
       byLine.textContent = m ? ('סומן ע"י ' + (m.by || '') + ' · ' + new Date(m.at).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' }) + (m.note ? ' · 📝 ' + m.note : '')) : '';
       byLine.style.display = m ? '' : 'none';
+      // התראות: נעדר ללא אישור + כפתור "הועבר לטיפול מחנך"; או נוכח למרות יציאה מאושרת
+      U.clear(flagLine); flagLine.style.display = 'none';
+      if (m && m.st === 'absent' && !leave) {
+        flagLine.style.display = '';
+        flagLine.appendChild(U.el('span', { class: 'tl tl-red', text: '⚠️ נעדר ללא אישור' }));
+        var parent = stu.parentPhone ? U.waNumber(stu.parentPhone) : null;
+        if (parent) flagLine.appendChild(U.el('button', { class: 'btn small ico', style: 'margin-inline-start:6px;background:#25D366;color:#fff;', title: 'הודעת וואטסאפ להורים', onclick: function () { waParents(stu); }, html: U.WA_SVG }));
+        if (!readOnly) {
+          var handled = !!m.handledAt;
+          flagLine.appendChild(U.el('button', { class: 'btn small ' + (handled ? '' : 'secondary'), style: 'margin-inline-start:6px;', title: handled ? 'טופל ע"י ' + (m.handledBy || '') : 'סימון: הועבר לטיפול מחנך', onclick: function () { Store.markHandled(attDate, stu.id, !handled); syncRow(); } }, handled ? '✓ בטיפול מחנך' : 'לטיפול מחנך'));
+        } else if (m.handledAt) {
+          flagLine.appendChild(U.el('span', { class: 'tl tl-green', style: 'margin-inline-start:6px;', text: '✓ בטיפול מחנך' }));
+        }
+      } else if (m && m.st === 'present' && leave) {
+        flagLine.style.display = '';
+        flagLine.appendChild(U.el('span', { class: 'tl tl-orange', text: '⚠️ סומן נוכח למרות אישור יציאה' }));
+      }
     }
 
     var btnGroup = U.el('div', { class: 'fwent-grp' }, U.ATT_STATUSES.map(function (st) {
@@ -195,13 +226,25 @@
       U.el('div', { class: 'fstu-name' }, [
         U.el('span', { text: stu.name + '  ' }),
         global.ClassBadge ? ClassBadge(stu.classId) : null,
+        leave ? U.el('span', { class: 'tl tl-orange', style: 'margin-inline-start:6px;', title: 'אישר: ' + (leave.approvedBy || '') + (leave.parentApproval ? ' · ' + leave.parentApproval : ''), text: '🏠 אושרה יציאה' + (leave.until ? ' · ' + leave.until : '') }) : null,
         streak >= 2 ? U.el('span', { class: 'tl tl-red', style: 'margin-inline-start:6px;', title: 'נעדר ' + streak + ' ערבים ברצף', text: '⚠️ ' + streak + ' ברצף' }) : null
       ]),
       U.el('div', { class: 'fstu-controls' }, [btnGroup, noteBtn])
     ]));
     row.appendChild(byLine);
+    row.appendChild(flagLine);
     syncRow();
     return row;
+  }
+
+  // הודעת וואטסאפ מוכנה להורים על היעדרות
+  function waParents(stu) {
+    var wn = U.waNumber(stu.parentPhone);
+    if (!wn) { U.toast('אין טלפון הורה תקין', 'error'); return; }
+    var msg = 'שלום, כאן פנימיית ישיבת רגבים בנימין.\n' +
+      'בנכם ' + stu.name + ' לא נמצא בפנימיה הערב (' + U.gregLabel(attDate) + ') ולא קיבלנו אישור יציאה.\n' +
+      'נודה לעדכון. תודה!';
+    window.open('https://wa.me/' + wn + '?text=' + encodeURIComponent(msg), '_blank');
   }
 
   function openNote(stu, sync) {
@@ -228,16 +271,18 @@
     var session = Store.attFor(attDate, true);
     var rest = students.filter(function (s) { return !session.marks[s.id]; });
     if (!rest.length) { U.toast('כל התלמידים כבר סומנו', 'info'); return; }
-    Modal.confirm({
-      title: 'סימון הנותרים כנוכחים',
-      text: 'לסמן ' + rest.length + ' תלמידים שטרם סומנו כ"נוכח"?',
-      okLabel: 'סמן נוכחים'
-    }, function () {
+    // תלמידים עם יציאה מאושרת → מסומנים "בבית באישור" ולא "נוכח"
+    var onLeave = rest.filter(function (s) { return Store.leaveOf(attDate, s.id); });
+    var txt = 'לסמן ' + (rest.length - onLeave.length) + ' תלמידים כ"נוכח"?' +
+      (onLeave.length ? '\n(' + onLeave.length + ' תלמידים עם יציאה מאושרת יסומנו "בבית באישור")' : '');
+    Modal.confirm({ title: 'סימון הנותרים', text: txt, okLabel: 'סמן' }, function () {
       var now = new Date().toISOString(), by = Store.myName();
-      rest.forEach(function (s) { session.marks[s.id] = { st: 'present', by: by, at: now }; });
+      rest.forEach(function (s) {
+        session.marks[s.id] = { st: Store.leaveOf(attDate, s.id) ? 'home' : 'present', by: by, at: now };
+      });
       Store.saveAtt(attDate);
       App.render();
-      U.toast('סומנו ' + rest.length + ' תלמידים כנוכחים');
+      U.toast('סומנו ' + rest.length + ' תלמידים');
     });
   }
 
